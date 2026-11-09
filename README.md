@@ -21,7 +21,8 @@ This repository contains the Android Studio project for **X70i VV Compatibility 
 - With Shizuku shell permission, can set **only the selected game's** ANGLE preference and restore the previous value.
 - Runs GLES 3 shader compile/link plus RGBA8, RGBA16F, sRGB and Depth24Stencil8 framebuffer checks in the helper process; reports EGL/GLES version, extensions, texture/renderbuffer limits and sample count.
 - Adds continuous, filtered logcat capture before launching MB Loader. It records the startup period, including initial black-screen and later fallback to Fancy, then returns captured graphics events to the assistant.
-- Shows Minecraft PID/process rows and collects filtered local ANGLE / EGL / Vulkan / PowerVR / RenderDragon / shader / framebuffer logs.\n- Adds a per-app clear operation that removes the Minecraft-only forced driver row and returns the package to the Android/MagicOS default driver rule; other apps' rows are preserved.\n- Scans package names containing ANGLE / OpenGL / GPU driver / graphics driver for the current Android user only, explicitly passing the current user ID to avoid cross-user enumeration errors.
+- Shows Minecraft PID/process rows and collects filtered local ANGLE / EGL / Vulkan / PowerVR / RenderDragon / shader / framebuffer logs.
+- Adds a per-app clear operation that removes the Minecraft-only forced driver row and returns the package to the Android/MagicOS default driver rule; other apps' rows are preserved.\n- Scans package names containing ANGLE / OpenGL / GPU driver / graphics driver for the current Android user only, explicitly passing the current user ID to avoid cross-user enumeration errors.
 - Does not enable global ANGLE-for-all, modify Minecraft files, touch worlds, or upload logs.
 
 ## Important limitations
