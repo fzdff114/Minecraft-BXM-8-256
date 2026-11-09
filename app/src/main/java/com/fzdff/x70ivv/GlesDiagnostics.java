@@ -40,9 +40,11 @@ public final class GlesDiagnostics implements GLSurfaceView.Renderer {
         out.append("GL_MAX_SAMPLES：").append(v[0]).append('\n');
 
         Set<String> extensions = new LinkedHashSet<>();
-        String ext = safe(GLES20.glGetString(GLES20.GL_EXTENSIONS));
-        if (!ext.isEmpty()) {
-            for (String item : ext.split("\\s+")) if (!item.isEmpty()) extensions.add(item);
+        int[] extensionCount = new int[1];
+        GLES30.glGetIntegerv(0x821D, extensionCount, 0); // GL_NUM_EXTENSIONS
+        for (int i = 0; i < Math.max(0, extensionCount[0]); i++) {
+            String item = GLES30.glGetStringi(GLES20.GL_EXTENSIONS, i);
+            if (item != null && !item.isEmpty()) extensions.add(item);
         }
         String[] important = {
                 "GL_EXT_color_buffer_float",
