@@ -140,7 +140,7 @@ public final class MainActivity extends Activity {
         LinearLayout statusCard = card();
         status = text("等待 Shizuku 授权", 14, 0xff246bfd, true);
         statusCard.addView(status, full());
-        statusCard.addView(text("只读取图形信息，并在有 ANGLE Provider 时修改目标游戏的单应用设置。不修改 Minecraft 文件或世界存档。", 13, 0xff475569, false), top(8));
+        statusCard.addView(text("只读取图形信息，并在有 ANGLE Provider 时修改 MB Loader 宿主的单应用驱动设置。不修改 Minecraft 文件或世界存档。", 13, 0xff475569, false), top(8));
         root.addView(statusCard, top(14));
 
         LinearLayout deviceCard = card();
@@ -164,8 +164,8 @@ public final class MainActivity extends Activity {
 
         LinearLayout ops = card();
         ops.addView(text("操作", 16, 0xff142033, true), full());
-        addButton(ops, "检测 ANGLE Provider / 游戏包", () -> withShell(this::inspect));
-        addButton(ops, "为目标游戏启用 ANGLE（仅 Provider 存在时）", () -> withShell(this::applyAngle));
+        addButton(ops, "检测 ANGLE Provider / MB Loader 宿主", () -> withShell(this::inspect));
+        addButton(ops, "为 MB Loader 宿主启用 ANGLE（仅 Provider 存在时）", () -> withShell(this::applyAngle));
         addButton(ops, "切回原生 OpenGL（诊断基线）", () -> withShell(this::setNativeDriver));
         addButton(ops, "清除 MB Loader 宿主的 ANGLE 强制覆盖（恢复系统默认）", () -> withShell(this::clearDriverOverride));
         restoreButton = button("恢复修改前的宿主驱动设置");
