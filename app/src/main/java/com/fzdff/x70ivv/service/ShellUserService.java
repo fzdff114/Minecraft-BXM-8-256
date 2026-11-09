@@ -212,7 +212,7 @@ public final class ShellUserService extends ICompatService.Stub {
             return "OK\n启动阶段监视已经运行。当前目标：" + captureTarget;
         }
         try {
-            Process process = new ProcessBuilder("logcat", "-b", "main", "-b", "system", "-b", "crash", "-b", "events",
+            Process process = new ProcessBuilder("logcat", "-b", "main,system,crash,events",
                     "-v", "threadtime", "-T", "1")
                     .redirectErrorStream(true).start();
             captureProcess = process;
@@ -260,6 +260,7 @@ public final class ShellUserService extends ICompatService.Stub {
 
     @Override
     public synchronized String stopGraphicsCapture() throws RemoteException {
+        captureActive = false;
         String snapshotPid = captureAppPid;
         if (snapshotPid.matches("[0-9]+")) {
             appendCapture("=== 宿主 PID " + snapshotPid + " 停止时日志缓冲区快照 ===");
@@ -273,7 +274,6 @@ public final class ShellUserService extends ICompatService.Stub {
         Thread monitor = captureMonitorThread;
         Process appProcess = captureAppProcess;
         Thread appReader = captureAppThread;
-        captureActive = false;
         run("log", "-t", "X70iVV", "CAPTURE_STOP target=" + captureTarget);
         if (process != null) {
             try { process.destroy(); } catch (Throwable ignored) { }
@@ -381,13 +381,13 @@ public final class ShellUserService extends ICompatService.Stub {
         try {
             Process previous = captureAppProcess;
             if (previous != null) previous.destroy();
-            Process appProcess = new ProcessBuilder("logcat", "--pid=" + pid, "-b", "main", "-b", "system", "-b", "crash", "-b", "events",
+            Process appProcess = new ProcessBuilder("logcat", "--pid=" + pid, "-b", "main,system,crash,events",
                     "-v", "threadtime", "-T", "1").redirectErrorStream(true).start();
             captureAppPid = pid;
             captureAppProcess = appProcess;
             captureAppLogExit = "running";
             captureAppLogLineCount = 0;
-            appendCapture("[X70iVV process] 已开启宿主 PID " + pid + " 的独立 logcat 流（全部标签）");
+            appendCapture("[X70iVV process] 已开启宿主 PID " + pid + " 的独立 logcat 流（main/system/crash/events）");
             Thread appReader = new Thread(() -> readAppProcessCapture(appProcess, pid),
                     "X70iVV-AppLog-" + pid);
             appReader.setDaemon(true);
@@ -416,7 +416,9 @@ public final class ShellUserService extends ICompatService.Stub {
             }
         } finally {
             try {
-                captureAppLogExit = "exit:" + process.exitValue();
+                int exitCode = process.exitValue();
+                captureAppLogExit = captureActive ? "unexpected-exit:" + exitCode
+                        : "stopped-by-helper (exit:" + exitCode + ")";
             } catch (IllegalThreadStateException ignored) {
                 if (!"still-running-after-stop".equals(captureAppLogExit)) {
                     captureAppLogExit = "stream-closed";
@@ -425,26 +427,52 @@ public final class ShellUserService extends ICompatService.Stub {
         }
     }
 
-    private static String runPidSnapshot(String pid) {
+    private String runPidSnapshot(String pid) {
+        StringBuilder report = new StringBuilder();
+        report.append("=== logcat 缓冲区统计 ===\\n").append(run("logcat", "-g")).append("\\n");
+        String[] buffers = {"main", "system", "crash", "events"};
+        for (String buffer : buffers) {
+            report.append("\\n=== PID ").append(pid).append(" / buffer ").append(buffer).append(" ===\\n");
+            report.append(runLogcatSnapshot(pid, buffer, 24_000));
+            report.append("\\n=== 系统图形日志 / buffer ").append(buffer).append(" ===\\n");
+            report.append(runLogcatSnapshot(null, buffer, 36_000));
+        }
+        return report.toString();
+    }
+
+    private String runLogcatSnapshot(String pid, String buffer, int maxChars) {
         Process process = null;
         StringBuilder output = new StringBuilder();
-        int lines = 0;
+        int rawLines = 0;
+        int keptLines = 0;
         try {
-            process = new ProcessBuilder("logcat", "-d", "--pid=" + pid, "-b", "main", "-b", "system", "-b", "crash", "-b", "events",
-                    "-v", "threadtime", "-t", "3000").redirectErrorStream(true).start();
+            List<String> command = new ArrayList<>();
+            command.add("logcat");
+            command.add("-d");
+            if (pid != null && pid.matches("[0-9]+")) command.add("--pid=" + pid);
+            command.add("-b");
+            command.add(buffer);
+            command.add("-v");
+            command.add("threadtime");
+            command.add("-t");
+            command.add("3000");
+            process = new ProcessBuilder(command).redirectErrorStream(true).start();
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    lines++;
-                    if (output.length() < 120_000) output.append(line).append('\n');
+                    rawLines++;
+                    if (pid != null || isGraphicsLogLine(line) || belongsToCaptureProcess(line)) {
+                        keptLines++;
+                        if (output.length() < maxChars) output.append(line).append('\\n');
+                    }
                 }
             }
             int exit = process.waitFor();
-            if (lines == 0) output.append("没有返回日志行。\n");
-            return "命令退出码：" + exit + "；返回行数：" + lines + "\n" + output;
+            return "命令退出码：" + exit + "；原始行数：" + rawLines + "；保留行数：" + keptLines
+                    + (output.length() == 0 ? "\\n无匹配日志行。\\n" : "\\n" + output);
         } catch (Exception error) {
-            return "快照命令失败：" + error.getClass().getSimpleName() + ": " + error.getMessage();
+            return "快照命令失败：" + error.getClass().getSimpleName() + ": " + error.getMessage() + "\\n";
         } finally {
             if (process != null) process.destroy();
         }
