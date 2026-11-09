@@ -34,7 +34,7 @@ The original Minecraft 26.60 APK splits are not included here. No custom RenderD
 
 Download the Android Studio project archive:
 
-[**X70iVVCompat-AndroidStudio-Project.zip**](https://github.com/fzdff114/Minecraft-BXM-8-256/raw/main/X70iVVCompat-AndroidStudio-Project.zip)
+[**下载完整 Android Studio 源码 ZIP**](https://github.com/fzdff114/Minecraft-BXM-8-256/archive/refs/heads/main.zip)
 
 Open the `X70iVVCompat` folder in Android Studio.
 
