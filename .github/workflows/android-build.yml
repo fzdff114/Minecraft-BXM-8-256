@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -75,3 +75,16 @@ jobs:
             X70i-VV-Compat-SHA256.txt
           if-no-files-found: error
           retention-days: 30
+ 
+      - name: Publish GitHub Release
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create x70i-vv-compat-v0.1.0-alpha.1 \
+            app/build/outputs/apk/debug/app-debug.apk \
+            X70i-VV-Compat-SHA256.txt \
+            --target "$GITHUB_SHA" \
+            --title "X70i VV Compatibility Assistant v0.1.0-alpha.1" \
+            --notes "Debug test build for Honor X70i / PowerVR BXM-8-256. Includes ANGLE provider detection, per-app ANGLE setting backup/restore through Shizuku, and local graphics log collection. This is a diagnostic helper, not a modified Minecraft APK or a guaranteed Vibrant Visuals fix." \
+            --prerelease
