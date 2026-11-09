@@ -52,6 +52,13 @@ public final class ShellUserService extends ICompatService.Stub {
         out.append("游戏进程 PID：").append(run("pidof", targetPackage)).append("\n");
         out.append("当前用户 Minecraft 进程：").append(processRows(targetPackage)).append("\n");
 
+        String currentUser = run("am", "get-current-user").trim();
+        if (!currentUser.matches("[0-9]+")) currentUser = "0";
+        String currentUserGraphicsPackages = run("sh", "-c",
+                "pm list packages --user " + currentUser + " 2>&1 | grep -Ei 'angle|opengl|gpu.*driver|graphics.*driver' || true").trim();
+        out.append("当前用户图形/ANGLE 相关包（仅 user ").append(currentUser).append("）：\\n")
+                .append(currentUserGraphicsPackages.isEmpty() ? "  未发现匹配包\\n" : currentUserGraphicsPackages + "\\n");
+
         out.append("ANGLE 候选包检测（逐个查询，不枚举所有用户）：\n");
         boolean found = false;
         for (String candidate : ANGLE_PACKAGES) {
@@ -127,6 +134,36 @@ public final class ShellUserService extends ICompatService.Stub {
         String label = "native".equals(driver) ? "原生 OpenGL" : ("default".equals(driver) ? "系统默认规则" : "ANGLE");
         return "OK\nBACKUP=" + encoded + "\n已将 " + targetPackage + " 设为 " + label
                 + "（单应用）。请完全停止 Minecraft 和 MB Loader 后重新启动测试。";
+    }
+
+    @Override
+    public String clearDriverOverride(String targetPackage) throws RemoteException {
+        if (!validPackage(targetPackage)) return "ERROR\\n目标包名格式无效。";
+        String path = run("pm", "path", targetPackage).trim();
+        if (!path.startsWith("package:")) return "ERROR\\n目标游戏包未安装或当前用户不可见：" + targetPackage;
+
+        String beforePkgs = setting(KEY_PKGS);
+        String beforeValues = setting(KEY_VALUES);
+        Map<String, String> current = parsePairs(beforePkgs, beforeValues);
+        if (current == null) {
+            return "ERROR\\n系统包名/驱动列表不匹配。为避免覆盖其他应用设置，已停止修改。";
+        }
+
+        boolean hadTarget = current.containsKey(targetPackage);
+        String oldValue = current.get(targetPackage);
+        JSONObject backup = new JSONObject();
+        try {
+            backup.put("hadTarget", hadTarget);
+            backup.put("oldValue", oldValue == null ? JSONObject.NULL : oldValue);
+        } catch (Exception ignored) { }
+
+        current.remove(targetPackage);
+        String error = writePairs(current);
+        if (!error.isEmpty()) return "ERROR\\n清除失败：" + error;
+
+        String encoded = Base64.encodeToString(backup.toString().getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
+        return "OK\\nBACKUP=" + encoded + "\\n已清除 " + targetPackage
+                + " 的单应用图形驱动覆盖。现在由 Android / MagicOS 按系统默认规则选择驱动；其他应用的配置保持不变。";
     }
 
     @Override
