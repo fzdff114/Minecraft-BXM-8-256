@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 /** Shizuku shell service: narrowly scoped graphics diagnostics and per-app driver preferences. */
@@ -37,6 +38,8 @@ public final class ShellUserService extends ICompatService.Stub {
     private volatile Process captureAppProcess;
     private volatile Thread captureAppThread;
     private volatile String captureAppPid = "";
+    private volatile int captureAppLogLineCount;
+    private volatile String captureAppLogExit = "not-started";
     private final Set<String> capturePids = new LinkedHashSet<>();
     private final StringBuilder captureBuffer = new StringBuilder();
 
@@ -214,6 +217,8 @@ public final class ShellUserService extends ICompatService.Stub {
             captureProcess = process;
             captureTarget = targetPackage;
             captureAppPid = "";
+            captureAppLogLineCount = 0;
+            captureAppLogExit = "not-started";
             captureAppProcess = null;
             captureAppThread = null;
             synchronized (capturePids) { capturePids.clear(); }
@@ -253,7 +258,15 @@ public final class ShellUserService extends ICompatService.Stub {
     }
 
     @Override
-    public String stopGraphicsCapture() throws RemoteException {
+    public synchronized String stopGraphicsCapture() throws RemoteException {
+        String snapshotPid = captureAppPid;
+        if (snapshotPid.matches("[0-9]+")) {
+            appendCapture("=== 宿主 PID " + snapshotPid + " 停止时日志缓冲区快照 ===");
+            String snapshot = runPidSnapshot(snapshotPid);
+            for (String line : snapshot.split("\\n")) {
+                if (!line.isEmpty()) appendCapture("[HOST PID " + snapshotPid + " SNAPSHOT] " + line);
+            }
+        }
         Process process = captureProcess;
         Thread reader = captureThread;
         Thread monitor = captureMonitorThread;
@@ -266,6 +279,18 @@ public final class ShellUserService extends ICompatService.Stub {
         }
         if (appProcess != null) {
             try { appProcess.destroy(); } catch (Throwable ignored) { }
+            try {
+                if (appProcess.waitFor(1, TimeUnit.SECONDS)) {
+                    captureAppLogExit = "exit:" + appProcess.exitValue();
+                } else {
+                    captureAppLogExit = "still-running-after-stop";
+                }
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                captureAppLogExit = "wait-interrupted";
+            } catch (Exception error) {
+                captureAppLogExit = "wait-error:" + error.getClass().getSimpleName();
+            }
         }
         if (monitor != null) monitor.interrupt();
         if (reader != null && reader != Thread.currentThread()) {
@@ -281,7 +306,11 @@ public final class ShellUserService extends ICompatService.Stub {
         String observedPids;
         synchronized (capturePids) { observedPids = capturePids.isEmpty() ? "无" : String.join(",", capturePids); }
         synchronized (captureBuffer) {
-            captureBuffer.append("\n结束时间：").append(System.currentTimeMillis()).append(" (epoch ms)\n");
+            captureBuffer.append("\n宿主 PID 独立日志流状态：PID=")
+                    .append(captureAppPid.isEmpty() ? "未启动" : captureAppPid)
+                    .append("，读取行数=").append(captureAppLogLineCount)
+                    .append("，退出状态=").append(captureAppLogExit).append("\n");
+            captureBuffer.append("结束时间：").append(System.currentTimeMillis()).append(" (epoch ms)\n");
             captureBuffer.append("结束时宿主 PID：").append(run("pidof", captureTarget)).append("\n");
             captureBuffer.append("结束时宿主进程：").append(processRows(captureTarget)).append("\n");
             captureBuffer.append("监视期间发现的 PID：").append(observedPids).append("\n");
@@ -355,6 +384,8 @@ public final class ShellUserService extends ICompatService.Stub {
                     "-v", "threadtime", "-T", "1").redirectErrorStream(true).start();
             captureAppPid = pid;
             captureAppProcess = appProcess;
+            captureAppLogExit = "running";
+            captureAppLogLineCount = 0;
             appendCapture("[X70iVV process] 已开启宿主 PID " + pid + " 的独立 logcat 流（全部标签）");
             Thread appReader = new Thread(() -> readAppProcessCapture(appProcess, pid),
                     "X70iVV-AppLog-" + pid);
@@ -362,6 +393,7 @@ public final class ShellUserService extends ICompatService.Stub {
             captureAppThread = appReader;
             appReader.start();
         } catch (Exception error) {
+            captureAppLogExit = "start-error:" + error.getClass().getSimpleName();
             appendCapture("[X70iVV process] 无法开启 PID " + pid + " 的独立日志流："
                     + error.getClass().getSimpleName() + ": " + error.getMessage());
         }
@@ -372,13 +404,48 @@ public final class ShellUserService extends ICompatService.Stub {
                 new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
+                captureAppLogLineCount++;
                 appendCapture("[HOST PID " + pid + "] " + line);
             }
         } catch (Exception error) {
             if (captureActive && captureAppProcess == process) {
+                captureAppLogExit = "reader-error:" + error.getClass().getSimpleName();
                 appendCapture("[X70iVV host log reader] PID " + pid + ": "
                         + error.getClass().getSimpleName() + ": " + error.getMessage());
             }
+        } finally {
+            try {
+                captureAppLogExit = "exit:" + process.exitValue();
+            } catch (IllegalThreadStateException ignored) {
+                if (!"still-running-after-stop".equals(captureAppLogExit)) {
+                    captureAppLogExit = "stream-closed";
+                }
+            }
+        }
+    }
+
+    private static String runPidSnapshot(String pid) {
+        Process process = null;
+        StringBuilder output = new StringBuilder();
+        int lines = 0;
+        try {
+            process = new ProcessBuilder("logcat", "-d", "--pid=" + pid, "-b", "all",
+                    "-v", "threadtime", "-t", "3000").redirectErrorStream(true).start();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    lines++;
+                    if (output.length() < 120_000) output.append(line).append('\\n');
+                }
+            }
+            int exit = process.waitFor();
+            if (lines == 0) output.append("没有返回日志行。\\n");
+            return "命令退出码：" + exit + "；返回行数：" + lines + "\\n" + output;
+        } catch (Exception error) {
+            return "快照命令失败：" + error.getClass().getSimpleName() + ": " + error.getMessage();
+        } finally {
+            if (process != null) process.destroy();
         }
     }
 
