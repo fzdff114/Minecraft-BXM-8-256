@@ -2,7 +2,7 @@
 
 **Honor X70i / PowerVR BXM-8-256 — Minecraft Bedrock native Vibrant Visuals compatibility research.**
 
-This repository contains the Android Studio project for **X70i VV Compatibility Assistant 0.2.2-alpha.5**. It is a diagnostic and per-app ANGLE preference helper, not a modified Minecraft APK or a GPU driver.
+This repository contains the Android Studio project for **X70i VV Compatibility Assistant 0.2.2-alpha.6**. It is a diagnostic and per-app ANGLE preference helper, not a modified Minecraft APK or a GPU driver.
 
 ## Device under investigation
 
@@ -20,9 +20,10 @@ This repository contains the Android Studio project for **X70i VV Compatibility 
 - Reads Android's per-app ANGLE settings.
 - With Shizuku shell permission, can set **only the selected game's** ANGLE preference and restore the previous value.
 - Runs GLES 3 shader compile/link plus RGBA8, RGBA16F, sRGB and Depth24Stencil8 framebuffer checks in the helper process; reports EGL/GLES version, extensions, texture/renderbuffer limits and sample count.
-- Uses the MB Loader host package for Android driver preferences, PID inspection, startup capture and launch. Minecraft's installed APK is treated as the source of DEX/native libraries rather than the running Android process. Continuous Shizuku logcat capture tracks the host PID and starts a second unfiltered `logcat --pid=<PID>` stream to retain all messages emitted by the MB Loader/MinecraftActivity process, alongside system graphics events.
+- Uses the MB Loader host package for Android driver preferences, PID inspection, startup capture and launch. Minecraft's installed APK is treated as the source of DEX/native libraries rather than the running Android process. Continuous Shizuku logcat capture tracks the host PID, starts a second unfiltered `logcat --pid=<PID>` stream, and runs a PID-filtered buffer snapshot when capture stops. The report includes the snapshot command exit code/line count and live stream line count/exit state, alongside system graphics events.
 - Shows Minecraft PID/process rows and collects filtered local ANGLE / EGL / Vulkan / PowerVR / RenderDragon / shader / framebuffer logs.
-- Adds a per-app clear operation that removes the Minecraft-only forced driver row and returns the package to the Android/MagicOS default driver rule; other apps' rows are preserved.\n- Scans package names containing ANGLE / OpenGL / GPU driver / graphics driver for the current Android user only, explicitly passing the current user ID to avoid cross-user enumeration errors.
+- Adds a per-app clear operation that removes the Minecraft-only forced driver row and returns the package to the Android/MagicOS default driver rule; other apps' rows are preserved.
+- Scans package names containing ANGLE / OpenGL / GPU driver / graphics driver for the current Android user only, explicitly passing the current user ID to avoid cross-user enumeration errors.
 - Does not enable global ANGLE-for-all, modify Minecraft files, touch worlds, or upload logs.
 
 ## Important limitations
