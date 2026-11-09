@@ -210,6 +210,13 @@ public final class ShellUserService extends ICompatService.Stub {
             captureProcess = process;
             captureTarget = targetPackage;
             synchronized (capturePids) { capturePids.clear(); }
+            String initialPids = run("pidof", targetPackage).trim();
+            synchronized (capturePids) {
+                capturePids.clear();
+                if (!initialPids.isEmpty()) {
+                    for (String pid : initialPids.split("\\s+")) if (pid.matches("[0-9]+")) capturePids.add(pid);
+                }
+            }
             synchronized (captureBuffer) {
                 captureBuffer.setLength(0);
                 captureBuffer.append("=== X70i VV 启动阶段连续日志 ===\n");
@@ -252,11 +259,13 @@ public final class ShellUserService extends ICompatService.Stub {
                 Thread.currentThread().interrupt();
             }
         }
+        String observedPids;
+        synchronized (capturePids) { observedPids = capturePids.isEmpty() ? "无" : String.join(",", capturePids); }
         synchronized (captureBuffer) {
             captureBuffer.append("\n结束时间：").append(System.currentTimeMillis()).append(" (epoch ms)\n");
             captureBuffer.append("结束时宿主 PID：").append(run("pidof", captureTarget)).append("\n");
             captureBuffer.append("结束时宿主进程：").append(processRows(captureTarget)).append("\n");
-            synchronized (capturePids) { captureBuffer.append("监视期间发现的 PID：").append(capturePids.isEmpty() ? "无" : String.join(",", capturePids)).append("\n"); }
+            captureBuffer.append("监视期间发现的 PID：").append(observedPids).append("\n");
             captureBuffer.append("=== 连续日志结束 ===\n");
             String report = captureBuffer.toString();
             captureProcess = null;
@@ -301,12 +310,14 @@ public final class ShellUserService extends ICompatService.Stub {
                 synchronized (capturePids) {
                     for (String pid : pids.split("\\s+")) {
                         if (pid.matches("[0-9]+") && capturePids.add(pid)) {
-                            appendCapture("[X70iVV process] 发现 MB Loader 宿主 PID=" + pid + "；" + processRows(captureTarget));
+                            // Log outside capturePids lock to avoid lock inversion with stopCapture().
                         }
                     }
                 }
+                // Re-read outside the PID-set lock to keep process snapshots consistent.
             }
-            try { Thread.sleep(500); }
+            if (!pids.isEmpty()) appendCapture("[X70iVV process] MB Loader 宿主 PID=" + pids + "；" + processRows(captureTarget));
+            try { Thread.sleep(1000); }
             catch (InterruptedException error) { Thread.currentThread().interrupt(); break; }
         }
     }
@@ -328,6 +339,7 @@ public final class ShellUserService extends ICompatService.Stub {
                 "surfaceflinger", "vkcreate", "vkqueue", "vk_error", "context lost",
                 "com.mojang.minecraftpe", "mbloader", "bambosan", "fancy", "vibrant visuals",
                 "graphics mode", "deferred", "fallback", "unsupported", "failed", "fatal",
+                "activitymanager", "activitytaskmanager", "androidruntime", "native crash",
                 "libvulkan", "vndksupport", "vk_", "gpu process", "gpu service",
                 "fatal signal", "gpu crash", "swapchain", "gralloc", "ion", "renderthread"
         };
