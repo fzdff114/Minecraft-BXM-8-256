@@ -58,10 +58,11 @@ public final class ShellUserService extends ICompatService.Stub {
         appendProperty(out, "Vendor GPU driver", "ro.vendor.gpu.driver.version");
         appendProperty(out, "Graphics driver 0", "ro.gfx.driver.0");
         appendProperty(out, "Graphics driver 1", "ro.gfx.driver.1");
-        out.append("游戏包：").append(targetPackage).append("\n");
-        out.append("游戏 APK 路径：").append(run("pm", "path", targetPackage)).append("\n");
-        out.append("游戏进程 PID：").append(run("pidof", targetPackage)).append("\n");
-        out.append("当前用户 Minecraft 进程：").append(processRows(targetPackage)).append("\n");
+        out.append("MB Loader 宿主包：").append(targetPackage).append("\n");
+        out.append("宿主 APK 路径：").append(run("pm", "path", targetPackage)).append("\n");
+        out.append("Minecraft 源 APK 路径（如已安装）：").append(run("pm", "path", "com.mojang.minecraftpe")).append("\n");
+        out.append("宿主进程 PID：").append(run("pidof", targetPackage)).append("\n");
+        out.append("当前用户 MB Loader 宿主进程：").append(processRows(targetPackage)).append("\n");
 
         String currentUser = run("am", "get-current-user").trim();
         if (!currentUser.matches("[0-9]+")) currentUser = "0";
@@ -352,14 +353,14 @@ public final class ShellUserService extends ICompatService.Stub {
 
     @Override
     public String collectGraphicsLogs() throws RemoteException {
-        String target = "com.mojang.minecraftpe";
+        String target = "io.github.bambosan.mbloader";
         StringBuilder out = new StringBuilder();
         out.append("=== 设备与渲染属性 ===\n");
         for (String key : new String[]{"ro.opengles.version", "ro.hardware.egl", "ro.hardware.vulkan",
                 "ro.vendor.gpu.driver.version", "ro.gfx.driver.0", "debug.hwui.renderer"}) {
             out.append(key).append(" = ").append(run("getprop", key)).append("\n");
         }
-        out.append("\n=== Minecraft 进程 ===\n").append(processRows(target)).append("\n");
+        out.append("\n=== MB Loader 宿主进程 ===\n").append(processRows(target)).append("\n");
         out.append("PID: ").append(run("pidof", target)).append("\n");
         out.append("\n=== Graphics / EGL / Vulkan / PowerVR 日志 ===\n");
         String command = "logcat -d -v threadtime -t 18000 | grep -Ei 'GraphicsEnvironment|ANGLE|PowerVR|BXM|Vulkan|RenderDragon|libGLES|EGL|GLES|framebuffer|shader|Mojang|fatal|GpuWatchdog|SurfaceFlinger|vkCreate|vkQueue|VK_ERROR|link program|compile.*shader|context lost' | tail -n 700";
