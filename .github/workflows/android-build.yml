@@ -81,10 +81,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create x70i-vv-compat-v0.2.2-alpha.4 \
+          gh release create x70i-vv-compat-v0.2.2-alpha.5 \
             app/build/outputs/apk/debug/app-debug.apk \
             X70i-VV-Compat-SHA256.txt \
             --target "$GITHUB_SHA" \
-            --title "X70i VV Compatibility Assistant v0.2.2-alpha.4" \
-            --notes "Debug test build for Honor X70i / PowerVR BXM-8-256. Targets ANGLE driver preferences, PID inspection, startup log capture and app launch at MB Loader's host package rather than the separate Minecraft APK source package. Tracks the host PID as it starts, captures process-specific and graphics events, and suppresses expected logcat shutdown interrupts. Diagnostics run in the helper's own GLES context and do not prove Minecraft RenderDragon compatibility. This is not a modified Minecraft APK or a GPU driver." \
+            --title "X70i VV Compatibility Assistant v0.2.2-alpha.5" \
+            --notes "Debug test build for Honor X70i / PowerVR BXM-8-256. Targets ANGLE preferences, process inspection and startup capture at the MB Loader host. When its PID appears, starts a separate unfiltered logcat stream for that PID to retain all MinecraftActivity/RenderDragon messages, alongside filtered system graphics logs. Diagnostics run in the helper's own GLES context and do not prove Minecraft RenderDragon compatibility. This is not a modified Minecraft APK or a GPU driver." \
             --prerelease

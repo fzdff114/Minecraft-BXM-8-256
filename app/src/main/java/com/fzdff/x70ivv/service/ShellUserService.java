@@ -34,6 +34,9 @@ public final class ShellUserService extends ICompatService.Stub {
     private volatile boolean captureActive;
     private volatile String captureTarget = "io.github.bambosan.mbloader";
     private volatile Thread captureMonitorThread;
+    private volatile Process captureAppProcess;
+    private volatile Thread captureAppThread;
+    private volatile String captureAppPid = "";
     private final Set<String> capturePids = new LinkedHashSet<>();
     private final StringBuilder captureBuffer = new StringBuilder();
 
@@ -210,6 +213,9 @@ public final class ShellUserService extends ICompatService.Stub {
                     .redirectErrorStream(true).start();
             captureProcess = process;
             captureTarget = targetPackage;
+            captureAppPid = "";
+            captureAppProcess = null;
+            captureAppThread = null;
             synchronized (capturePids) { capturePids.clear(); }
             String initialPids = run("pidof", targetPackage).trim();
             synchronized (capturePids) {
@@ -232,6 +238,8 @@ public final class ShellUserService extends ICompatService.Stub {
             reader.setDaemon(true);
             captureThread = reader;
             reader.start();
+            String firstPid = initialPids.isEmpty() ? "" : initialPids.split("\\s+")[0];
+            if (firstPid.matches("[0-9]+")) startAppProcessCapture(firstPid);
             Thread monitor = new Thread(this::monitorCaptureProcess, "X70iVV-ProcessMonitor");
             monitor.setDaemon(true);
             captureMonitorThread = monitor;
@@ -249,14 +257,24 @@ public final class ShellUserService extends ICompatService.Stub {
         Process process = captureProcess;
         Thread reader = captureThread;
         Thread monitor = captureMonitorThread;
+        Process appProcess = captureAppProcess;
+        Thread appReader = captureAppThread;
         captureActive = false;
         run("log", "-t", "X70iVV", "CAPTURE_STOP target=" + captureTarget);
         if (process != null) {
             try { process.destroy(); } catch (Throwable ignored) { }
         }
+        if (appProcess != null) {
+            try { appProcess.destroy(); } catch (Throwable ignored) { }
+        }
         if (monitor != null) monitor.interrupt();
         if (reader != null && reader != Thread.currentThread()) {
             try { reader.join(1500); } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        if (appReader != null && appReader != Thread.currentThread()) {
+            try { appReader.join(1500); } catch (InterruptedException error) {
                 Thread.currentThread().interrupt();
             }
         }
@@ -272,6 +290,9 @@ public final class ShellUserService extends ICompatService.Stub {
             captureProcess = null;
             captureThread = null;
             captureMonitorThread = null;
+            captureAppProcess = null;
+            captureAppThread = null;
+            captureAppPid = "";
             if (report.length() > 500_000) {
                 report = report.substring(report.length() - 500_000);
             }
@@ -318,9 +339,46 @@ public final class ShellUserService extends ICompatService.Stub {
             if (!newlyFound.isEmpty()) {
                 appendCapture("[X70iVV process] 发现 MB Loader 宿主 PID=" + String.join(",", newlyFound)
                         + "；" + processRows(captureTarget));
+                startAppProcessCapture(newlyFound.get(0));
             }
             try { Thread.sleep(1000); }
             catch (InterruptedException error) { Thread.currentThread().interrupt(); break; }
+        }
+    }
+
+    private synchronized void startAppProcessCapture(String pid) {
+        if (!captureActive || pid == null || !pid.matches("[0-9]+") || pid.equals(captureAppPid)) return;
+        try {
+            Process previous = captureAppProcess;
+            if (previous != null) previous.destroy();
+            Process appProcess = new ProcessBuilder("logcat", "--pid=" + pid, "-b", "all",
+                    "-v", "threadtime", "-T", "1").redirectErrorStream(true).start();
+            captureAppPid = pid;
+            captureAppProcess = appProcess;
+            appendCapture("[X70iVV process] 已开启宿主 PID " + pid + " 的独立 logcat 流（全部标签）");
+            Thread appReader = new Thread(() -> readAppProcessCapture(appProcess, pid),
+                    "X70iVV-AppLog-" + pid);
+            appReader.setDaemon(true);
+            captureAppThread = appReader;
+            appReader.start();
+        } catch (Exception error) {
+            appendCapture("[X70iVV process] 无法开启 PID " + pid + " 的独立日志流："
+                    + error.getClass().getSimpleName() + ": " + error.getMessage());
+        }
+    }
+
+    private void readAppProcessCapture(Process process, String pid) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                appendCapture("[HOST PID " + pid + "] " + line);
+            }
+        } catch (Exception error) {
+            if (captureActive && captureAppProcess == process) {
+                appendCapture("[X70iVV host log reader] PID " + pid + ": "
+                        + error.getClass().getSimpleName() + ": " + error.getMessage());
+            }
         }
     }
 
