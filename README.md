@@ -2,7 +2,7 @@
 
 **Honor X70i / PowerVR BXM-8-256 — Minecraft Bedrock native Vibrant Visuals compatibility research.**
 
-This repository contains the Android Studio project for **X70i VV Compatibility Assistant 0.2.2-alpha.3**. It is a diagnostic and per-app ANGLE preference helper, not a modified Minecraft APK or a GPU driver.
+This repository contains the Android Studio project for **X70i VV Compatibility Assistant 0.2.2-alpha.4**. It is a diagnostic and per-app ANGLE preference helper, not a modified Minecraft APK or a GPU driver.
 
 ## Device under investigation
 
@@ -20,7 +20,7 @@ This repository contains the Android Studio project for **X70i VV Compatibility 
 - Reads Android's per-app ANGLE settings.
 - With Shizuku shell permission, can set **only the selected game's** ANGLE preference and restore the previous value.
 - Runs GLES 3 shader compile/link plus RGBA8, RGBA16F, sRGB and Depth24Stencil8 framebuffer checks in the helper process; reports EGL/GLES version, extensions, texture/renderbuffer limits and sample count.
-- Adds continuous Shizuku logcat capture targeting the MB Loader host process, where the embedded Minecraft Activity runs. It tracks the host PID as it starts and captures its process-specific logs plus graphics errors.
+- Uses the MB Loader host package for Android driver preferences, PID inspection, startup capture and launch. Minecraft's installed APK is treated as the source of DEX/native libraries rather than the running Android process. Continuous Shizuku logcat capture tracks the host PID and captures process-specific logs plus graphics errors.
 - Shows Minecraft PID/process rows and collects filtered local ANGLE / EGL / Vulkan / PowerVR / RenderDragon / shader / framebuffer logs.
 - Adds a per-app clear operation that removes the Minecraft-only forced driver row and returns the package to the Android/MagicOS default driver rule; other apps' rows are preserved.\n- Scans package names containing ANGLE / OpenGL / GPU driver / graphics driver for the current Android user only, explicitly passing the current user ID to avoid cross-user enumeration errors.
 - Does not enable global ANGLE-for-all, modify Minecraft files, touch worlds, or upload logs.
@@ -55,7 +55,7 @@ A successful build proves that the app compiles; it does **not** prove Vibrant V
 4. Set the package name of the process that actually renders the Minecraft 3D world (default: `com.mojang.minecraftpe`). If MB Loader launches an isolated/clone instance, use that instance's package name instead.
 5. Keep the MB Loader launcher package separate (default: `io.github.bambosan.mbloader`).
 6. Run detection first. If an old `angle` override exists but no provider is installed, use **Clear Minecraft ANGLE override** to remove only the Minecraft row and return the package to the system default. Do not select ANGLE without a provider.
-7. For Minecraft 26.62 startup transitions, tap **开始记录启动过程并打开 MB Loader** before launching the game. The capture target is the MB Loader host package (`io.github.bambosan.mbloader`), not the separately installed Minecraft package. Reproduce the black-screen-to-Fancy fallback, return to this assistant, then tap **停止监视并读取启动日志**. Share the captured output.
+7. For Minecraft 26.62 startup transitions, use the MB Loader host package (`io.github.bambosan.mbloader`) as the target for driver settings and process capture. Tap **开始记录启动过程并打开 MB Loader** before launching the game, reproduce the fallback, then stop and copy the log. Reproduce the black-screen-to-Fancy fallback, return to this assistant, then tap **停止监视并读取启动日志**. Share the captured output.
 
 Shizuku: https://shizuku.rikka.app/download/
 
