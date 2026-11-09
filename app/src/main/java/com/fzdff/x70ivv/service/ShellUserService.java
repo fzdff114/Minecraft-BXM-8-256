@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 /** Shizuku shell service: narrowly scoped graphics diagnostics and per-app driver preferences. */
@@ -25,6 +26,12 @@ public final class ShellUserService extends ICompatService.Stub {
             "com.google.android.angle"
     };
     private static final Pattern PACKAGE = Pattern.compile("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+");
+    private static final int MAX_CAPTURE_CHARS = 360_000;
+    private volatile Process captureProcess;
+    private volatile Thread captureThread;
+    private volatile boolean captureActive;
+    private volatile String captureTarget = "com.mojang.minecraftpe";
+    private final StringBuilder captureBuffer = new StringBuilder();
 
     @Override public void destroy() { System.exit(0); }
     @Override public void exit() { destroy(); }
@@ -185,6 +192,108 @@ public final class ShellUserService extends ICompatService.Stub {
         } catch (Exception error) {
             return "ERROR\n备份数据无效：" + error.getMessage();
         }
+    }
+
+    @Override
+    public synchronized String startGraphicsCapture(String targetPackage) throws RemoteException {
+        if (!validPackage(targetPackage)) return "ERROR\\n目标包名格式无效。";
+        if (captureActive) {
+            return "OK\\n启动阶段监视已经运行。当前目标：" + captureTarget;
+        }
+        try {
+            Process process = new ProcessBuilder("logcat", "-b", "all", "-v", "threadtime", "-T", "1")
+                    .redirectErrorStream(true).start();
+            captureProcess = process;
+            captureTarget = targetPackage;
+            synchronized (captureBuffer) {
+                captureBuffer.setLength(0);
+                captureBuffer.append("=== X70i VV 启动阶段连续日志 ===\\n");
+                captureBuffer.append("开始时间：").append(System.currentTimeMillis()).append(" (epoch ms)\\n");
+                captureBuffer.append("目标包：").append(targetPackage).append("\\n");
+                captureBuffer.append("启动前 PID：").append(run("pidof", targetPackage)).append("\\n");
+            }
+            captureActive = true;
+            run("log", "-t", "X70iVV", "CAPTURE_START target=" + targetPackage);
+            Thread reader = new Thread(() -> readCapture(process), "X70iVV-Logcat");
+            reader.setDaemon(true);
+            captureThread = reader;
+            reader.start();
+            return "OK\\n已开始持续记录图形日志。现在可以启动 MBL2；记录会覆盖加载黑屏和后续切回花式的阶段。\\n返回助手后点击“停止监视并读取启动日志”。";
+        } catch (Exception error) {
+            captureActive = false;
+            captureProcess = null;
+            return "ERROR\\n无法启动 logcat 连续记录：" + error.getClass().getSimpleName() + ": " + error.getMessage();
+        }
+    }
+
+    @Override
+    public String stopGraphicsCapture() throws RemoteException {
+        Process process = captureProcess;
+        Thread reader = captureThread;
+        captureActive = false;
+        run("log", "-t", "X70iVV", "CAPTURE_STOP target=" + captureTarget);
+        if (process != null) {
+            try { process.destroy(); } catch (Throwable ignored) { }
+        }
+        if (reader != null && reader != Thread.currentThread()) {
+            try { reader.join(1500); } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        synchronized (captureBuffer) {
+            captureBuffer.append("\\n结束时间：").append(System.currentTimeMillis()).append(" (epoch ms)\\n");
+            captureBuffer.append("结束时 PID：").append(run("pidof", captureTarget)).append("\\n");
+            captureBuffer.append("结束时进程：").append(processRows(captureTarget)).append("\\n");
+            captureBuffer.append("=== 连续日志结束 ===\\n");
+            String report = captureBuffer.toString();
+            captureProcess = null;
+            captureThread = null;
+            if (report.length() > 500_000) {
+                report = report.substring(report.length() - 500_000);
+            }
+            return report;
+        }
+    }
+
+    private void readCapture(Process process) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (isGraphicsLogLine(line)) appendCapture(line);
+            }
+        } catch (Exception error) {
+            appendCapture("[X70iVV capture reader] " + error.getClass().getSimpleName() + ": " + error.getMessage());
+        } finally {
+            if (captureProcess == process) captureActive = false;
+        }
+    }
+
+    private void appendCapture(String line) {
+        synchronized (captureBuffer) {
+            captureBuffer.append(line).append('\\n');
+            if (captureBuffer.length() > MAX_CAPTURE_CHARS) {
+                int removeTo = captureBuffer.length() - (MAX_CAPTURE_CHARS * 3 / 4);
+                int newline = captureBuffer.indexOf("\\n", removeTo);
+                captureBuffer.delete(0, newline >= 0 ? newline + 1 : removeTo);
+            }
+        }
+    }
+
+    private static boolean isGraphicsLogLine(String line) {
+        String value = line.toLowerCase(Locale.ROOT);
+        String[] keys = {
+                "graphicsenvironment", "angle", "powervr", "bxm", "vulkan", "renderdragon",
+                "libgles", "gles", "egl", "framebuffer", "shader", "gpuwatchdog",
+                "surfaceflinger", "vkcreate", "vkqueue", "vk_error", "context lost",
+                "com.mojang.minecraftpe", "mbloader", "bambosan", "fancy", "vibrant visuals",
+                "graphics mode", "deferred", "fallback", "unsupported", "failed", "fatal",
+                "fatal signal", "gpu crash", "swapchain", "gralloc", "ion", "renderthread"
+        };
+        for (String key : keys) {
+            if (value.contains(key)) return true;
+        }
+        return false;
     }
 
     @Override
