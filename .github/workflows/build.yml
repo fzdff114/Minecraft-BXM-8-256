@@ -17,22 +17,23 @@ jobs:
       - name: Ensure old APK payloads are absent
         shell: bash
         run: |
-          if git ls-files | grep -Eiq '\\.(apk|apks|xapk); then
+          if git ls-files | grep -Eiq '[.](apk|apks|xapk)$'; then
             echo "Tracked APK/APKS files must not be part of this source repository."
-            git ls-files | grep -Ei '\\.(apk|apks|xapk)
+            git ls-files | grep -Ei '[.](apk|apks|xapk)$'
             exit 1
           fi
 
-      - name: Install Android NDK and CMake
+      - name: Install Android SDK tools
         uses: android-actions/setup-android@v3
 
-      - name: Install toolchain packages
+      - name: Install NDK and CMake
         shell: bash
         run: |
           sdkmanager "ndk;28.0.13004108" "cmake;3.31.1" "platforms;android-35"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.0.13004108" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=\${ANDROID_HOME}/ndk/28.0.13004108" >> "$GITHUB_ENV"
 
       - name: Configure arm64-v8a
+        shell: bash
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
@@ -40,10 +41,10 @@ jobs:
             -DANDROID_PLATFORM=android-26 \
             -DCMAKE_BUILD_TYPE=Release
 
-      - name: Compile
+      - name: Compile native library
         run: cmake --build build --parallel 2
 
-      - name: Verify ELF and JNI exports
+      - name: Verify ELF and forwarded JNI exports
         shell: bash
         run: |
           test -s build/libmods.so
@@ -51,141 +52,8 @@ jobs:
           readelf -h build/libmods.so | grep -q 'AArch64'
           readelf -Ws build/libmods.so | grep -q 'JNI_OnLoad'
           for method in customBuffers dynamicShadows dofBlur fixGameLogo forceCloseOreUi; do
-            readelf -Ws build/libmods.so | grep -q "Java_io_bambosan_mbloader_launcherUtils_NativeMods_${method}"
+            readelf -Ws build/libmods.so | grep -q "Java_io_bambosan_mbloader_launcherUtils_NativeMods_\${method}"
           done
-          mkdir -p dist
-          cp build/libmods.so dist/libmods-waterfx-arm64-v0.1.0.so
-          sha256sum dist/libmods-waterfx-arm64-v0.1.0.so > dist/SHA256SUMS.txt
-
-      - name: Upload native build
-        uses: actions/upload-artifact@v4
-        with:
-          name: MBLoader-WaterFX-native-arm64
-          path: dist/*
-          if-no-files-found: error
-; then
-            echo "Tracked APK/APKS files must not be part of this source repository."
-            git ls-files | grep -Ei '\\.apks?$'
-            exit 1
-          fi
-
-      - name: Install Android NDK and CMake
-        uses: android-actions/setup-android@v3
-
-      - name: Install toolchain packages
-        shell: bash
-        run: |
-          sdkmanager "ndk;28.0.13004108" "cmake;3.31.1" "platforms;android-35"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.0.13004108" >> "$GITHUB_ENV"
-
-      - name: Configure arm64-v8a
-        run: |
-          cmake -S . -B build -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-26 \
-            -DCMAKE_BUILD_TYPE=Release
-
-      - name: Compile
-        run: cmake --build build --parallel 2
-
-      - name: Verify ELF and JNI exports
-        shell: bash
-        run: |
-          test -s build/libmods.so
-          file build/libmods.so
-          readelf -h build/libmods.so | grep -q 'AArch64'
-          readelf -Ws build/libmods.so | grep -q 'JNI_OnLoad'
-          readelf -Ws build/libmods.so | grep -q 'Java_io_bambosan_mbloader_launcherUtils_NativeMods_customBuffers'
-          readelf -Ws build/libmods.so | grep -q 'Java_io_bambosan_mbloader_launcherUtils_NativeMods_dynamicShadows'
-          mkdir -p dist
-          cp build/libmods.so dist/libmods-waterfx-arm64-v0.1.0.so
-          sha256sum dist/libmods-waterfx-arm64-v0.1.0.so > dist/SHA256SUMS.txt
-
-      - name: Upload native build
-        uses: actions/upload-artifact@v4
-        with:
-          name: MBLoader-WaterFX-native-arm64
-          path: dist/*
-          if-no-files-found: error
-
-            exit 1
-          fi
-
-      - name: Install Android NDK and CMake
-        uses: android-actions/setup-android@v3
-
-      - name: Install toolchain packages
-        shell: bash
-        run: |
-          sdkmanager "ndk;28.0.13004108" "cmake;3.31.1" "platforms;android-35"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.0.13004108" >> "$GITHUB_ENV"
-
-      - name: Configure arm64-v8a
-        run: |
-          cmake -S . -B build -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-26 \
-            -DCMAKE_BUILD_TYPE=Release
-
-      - name: Compile
-        run: cmake --build build --parallel 2
-
-      - name: Verify ELF and JNI exports
-        shell: bash
-        run: |
-          test -s build/libmods.so
-          file build/libmods.so
-          readelf -h build/libmods.so | grep -q 'AArch64'
-          readelf -Ws build/libmods.so | grep -q 'JNI_OnLoad'
-          readelf -Ws build/libmods.so | grep -q 'Java_io_bambosan_mbloader_launcherUtils_NativeMods_customBuffers'
-          readelf -Ws build/libmods.so | grep -q 'Java_io_bambosan_mbloader_launcherUtils_NativeMods_dynamicShadows'
-          mkdir -p dist
-          cp build/libmods.so dist/libmods-waterfx-arm64-v0.1.0.so
-          sha256sum dist/libmods-waterfx-arm64-v0.1.0.so > dist/SHA256SUMS.txt
-
-      - name: Upload native build
-        uses: actions/upload-artifact@v4
-        with:
-          name: MBLoader-WaterFX-native-arm64
-          path: dist/*
-          if-no-files-found: error
-; then
-            echo "Tracked APK/APKS files must not be part of this source repository."
-            git ls-files | grep -Ei '\\.apks?$'
-            exit 1
-          fi
-
-      - name: Install Android NDK and CMake
-        uses: android-actions/setup-android@v3
-
-      - name: Install toolchain packages
-        shell: bash
-        run: |
-          sdkmanager "ndk;28.0.13004108" "cmake;3.31.1" "platforms;android-35"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.0.13004108" >> "$GITHUB_ENV"
-
-      - name: Configure arm64-v8a
-        run: |
-          cmake -S . -B build -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-26 \
-            -DCMAKE_BUILD_TYPE=Release
-
-      - name: Compile
-        run: cmake --build build --parallel 2
-
-      - name: Verify ELF and JNI exports
-        shell: bash
-        run: |
-          test -s build/libmods.so
-          file build/libmods.so
-          readelf -h build/libmods.so | grep -q 'AArch64'
-          readelf -Ws build/libmods.so | grep -q 'JNI_OnLoad'
-          readelf -Ws build/libmods.so | grep -q 'Java_io_bambosan_mbloader_launcherUtils_NativeMods_customBuffers'
-          readelf -Ws build/libmods.so | grep -q 'Java_io_bambosan_mbloader_launcherUtils_NativeMods_dynamicShadows'
           mkdir -p dist
           cp build/libmods.so dist/libmods-waterfx-arm64-v0.1.0.so
           sha256sum dist/libmods-waterfx-arm64-v0.1.0.so > dist/SHA256SUMS.txt
