@@ -175,6 +175,7 @@ public final class MainActivity extends Activity {
         addButton(ops, "检测 ANGLE Provider / 游戏包", () -> withShell(this::inspect));
         addButton(ops, "为目标游戏启用 ANGLE（仅 Provider 存在时）", () -> withShell(this::applyAngle));
         addButton(ops, "切回原生 OpenGL（诊断基线）", () -> withShell(this::setNativeDriver));
+        addButton(ops, "清除 Minecraft 的 ANGLE 强制覆盖（恢复系统默认）", () -> withShell(this::clearDriverOverride));
         restoreButton = button("恢复修改前的驱动设置");
         restoreButton.setEnabled(false);
         restoreButton.setAlpha(0.45f);
@@ -281,6 +282,13 @@ public final class MainActivity extends Activity {
 
     private void setNativeDriver() {
         setDriver("native");
+    }
+
+    private void clearDriverOverride() {
+        String pkg = targetPackage();
+        if (pkg.isEmpty()) { toast("请填写 Minecraft 游戏包名"); return; }
+        status("正在清除 Minecraft 的 ANGLE 强制覆盖…");
+        remote(() -> service.clearDriverOverride(pkg), value -> saveBackup(pkg, value));
     }
 
     private void setDriver(String driver) {
