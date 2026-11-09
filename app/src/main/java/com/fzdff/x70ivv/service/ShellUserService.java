@@ -429,12 +429,12 @@ public final class ShellUserService extends ICompatService.Stub {
 
     private String runPidSnapshot(String pid) {
         StringBuilder report = new StringBuilder();
-        report.append("=== logcat 缓冲区统计 ===\\n").append(run("logcat", "-g")).append("\\n");
+        report.append("=== logcat 缓冲区统计 ===\n").append(run("logcat", "-g")).append("\n");
         String[] buffers = {"main", "system", "crash", "events"};
         for (String buffer : buffers) {
-            report.append("\\n=== PID ").append(pid).append(" / buffer ").append(buffer).append(" ===\\n");
+            report.append("\n=== PID ").append(pid).append(" / buffer ").append(buffer).append(" ===\n");
             report.append(runLogcatSnapshot(pid, buffer, 24_000));
-            report.append("\\n=== 系统图形日志 / buffer ").append(buffer).append(" ===\\n");
+            report.append("\n=== 系统图形日志 / buffer ").append(buffer).append(" ===\n");
             report.append(runLogcatSnapshot(null, buffer, 36_000));
         }
         return report.toString();
@@ -464,15 +464,15 @@ public final class ShellUserService extends ICompatService.Stub {
                     rawLines++;
                     if (pid != null || isGraphicsLogLine(line) || belongsToCaptureProcess(line)) {
                         keptLines++;
-                        if (output.length() < maxChars) output.append(line).append('\\n');
+                        if (output.length() < maxChars) output.append(line).append('\n');
                     }
                 }
             }
             int exit = process.waitFor();
             return "命令退出码：" + exit + "；原始行数：" + rawLines + "；保留行数：" + keptLines
-                    + (output.length() == 0 ? "\\n无匹配日志行。\\n" : "\\n" + output);
+                    + (output.length() == 0 ? "\n无匹配日志行。\n" : "\n" + output);
         } catch (Exception error) {
-            return "快照命令失败：" + error.getClass().getSimpleName() + ": " + error.getMessage() + "\\n";
+            return "快照命令失败：" + error.getClass().getSimpleName() + ": " + error.getMessage() + "\n";
         } finally {
             if (process != null) process.destroy();
         }
