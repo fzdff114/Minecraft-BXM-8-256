@@ -1,0 +1,60 @@
+# Minecraft-BXM-8-256
+
+**Honor X70i / PowerVR BXM-8-256 — Minecraft Bedrock native Vibrant Visuals compatibility research.**
+
+This repository contains the Android Studio project for **X70i VV Compatibility Assistant**. It is a diagnostic and per-app ANGLE preference helper, not a modified Minecraft APK or a GPU driver.
+
+## Device under investigation
+
+- Device: HONOR X70i (ABR-AN00)
+- SoC: MediaTek Dimensity 7025 / MT6855
+- GPU: Imagination PowerVR BXM-8-256
+- Android: 16 / MagicOS 10
+- Reported GLES: OpenGL ES 3.2
+- Driver shown by AIDA64: 25.1@6715691
+
+## What the assistant does
+
+- Reads device, Vulkan feature declarations, and its own GLES renderer string.
+- Checks whether an ANGLE-related package/provider appears to be installed.
+- Reads Android's per-app ANGLE settings.
+- With Shizuku shell permission, can set **only the selected game's** ANGLE preference and restore the previous value.
+- Collects filtered local graphics logs (ANGLE / EGL / Vulkan / PowerVR / RenderDragon / shader / framebuffer).
+- Does not enable global ANGLE-for-all, modify Minecraft files, touch worlds, or upload logs.
+
+## Important limitations
+
+This helper cannot add GPU features or repair a vendor driver. Seeing an ANGLE package is only a preliminary check; it does not prove the ROM can load ANGLE for Minecraft. ANGLE only intercepts OpenGL ES paths. If the Minecraft build uses Vulkan directly for its relevant RenderDragon path, changing the OpenGL driver preference will not affect that path.
+
+The ANGLE route is optional and should only be tested when the ROM exposes a working ANGLE provider. The app saves the game's previous setting and offers a per-package restore. **Do not enable the global `angle_gl_driver_all_angle` setting.**
+
+The original Minecraft 26.60 APK splits are not included here. No custom RenderDragon pass or modified Minecraft APK is claimed.
+
+## Source project
+
+Download the Android Studio project archive:
+
+[**X70iVVCompat-AndroidStudio-Project.zip**](https://github.com/fzdff114/Minecraft-BXM-8-256/raw/main/X70iVVCompat-AndroidStudio-Project.zip)
+
+Open the `X70iVVCompat` folder in Android Studio.
+
+## Build
+
+GitHub Actions builds a debug-signed APK for testing on pushes to `main` and on manual workflow dispatch. The APK is uploaded as the `X70i-VV-Compat-Debug-APK` workflow artifact.
+
+A successful build proves that the app compiles; it does **not** prove Vibrant Visuals works on the X70i. Device validation is still required.
+
+## Setup
+
+1. Install and start Shizuku using its Wireless debugging flow.
+2. Install the debug APK.
+3. Grant the app Shizuku permission.
+4. Set the package name of the process that actually renders the Minecraft 3D world (default: `com.mojang.minecraftpe`). If MB Loader launches an isolated/clone instance, use that instance's package name instead.
+5. Keep the MB Loader launcher package separate (default: `io.github.bambosan.mbloader`).
+6. Run detection first. Only try ANGLE if a provider is present, then restore if the result is worse or unchanged.
+
+Shizuku: https://shizuku.rikka.app/download/
+
+## Privacy
+
+The Android app has no Internet permission. Device details and collected logs stay local unless the user manually copies and shares them.
