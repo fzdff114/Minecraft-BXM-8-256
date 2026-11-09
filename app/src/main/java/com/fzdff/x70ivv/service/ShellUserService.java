@@ -196,9 +196,9 @@ public final class ShellUserService extends ICompatService.Stub {
 
     @Override
     public synchronized String startGraphicsCapture(String targetPackage) throws RemoteException {
-        if (!validPackage(targetPackage)) return "ERROR\\n目标包名格式无效。";
+        if (!validPackage(targetPackage)) return "ERROR\n目标包名格式无效。";
         if (captureActive) {
-            return "OK\\n启动阶段监视已经运行。当前目标：" + captureTarget;
+            return "OK\n启动阶段监视已经运行。当前目标：" + captureTarget;
         }
         try {
             Process process = new ProcessBuilder("logcat", "-b", "all", "-v", "threadtime", "-T", "1")
@@ -207,10 +207,10 @@ public final class ShellUserService extends ICompatService.Stub {
             captureTarget = targetPackage;
             synchronized (captureBuffer) {
                 captureBuffer.setLength(0);
-                captureBuffer.append("=== X70i VV 启动阶段连续日志 ===\\n");
-                captureBuffer.append("开始时间：").append(System.currentTimeMillis()).append(" (epoch ms)\\n");
-                captureBuffer.append("目标包：").append(targetPackage).append("\\n");
-                captureBuffer.append("启动前 PID：").append(run("pidof", targetPackage)).append("\\n");
+                captureBuffer.append("=== X70i VV 启动阶段连续日志 ===\n");
+                captureBuffer.append("开始时间：").append(System.currentTimeMillis()).append(" (epoch ms)\n");
+                captureBuffer.append("目标包：").append(targetPackage).append("\n");
+                captureBuffer.append("启动前 PID：").append(run("pidof", targetPackage)).append("\n");
             }
             captureActive = true;
             run("log", "-t", "X70iVV", "CAPTURE_START target=" + targetPackage);
@@ -218,11 +218,11 @@ public final class ShellUserService extends ICompatService.Stub {
             reader.setDaemon(true);
             captureThread = reader;
             reader.start();
-            return "OK\\n已开始持续记录图形日志。现在可以启动 MBL2；记录会覆盖加载黑屏和后续切回花式的阶段。\\n返回助手后点击“停止监视并读取启动日志”。";
+            return "OK\n已开始持续记录图形日志。现在可以启动 MBL2；记录会覆盖加载黑屏和后续切回花式的阶段。\n返回助手后点击“停止监视并读取启动日志”。";
         } catch (Exception error) {
             captureActive = false;
             captureProcess = null;
-            return "ERROR\\n无法启动 logcat 连续记录：" + error.getClass().getSimpleName() + ": " + error.getMessage();
+            return "ERROR\n无法启动 logcat 连续记录：" + error.getClass().getSimpleName() + ": " + error.getMessage();
         }
     }
 
@@ -241,10 +241,10 @@ public final class ShellUserService extends ICompatService.Stub {
             }
         }
         synchronized (captureBuffer) {
-            captureBuffer.append("\\n结束时间：").append(System.currentTimeMillis()).append(" (epoch ms)\\n");
-            captureBuffer.append("结束时 PID：").append(run("pidof", captureTarget)).append("\\n");
-            captureBuffer.append("结束时进程：").append(processRows(captureTarget)).append("\\n");
-            captureBuffer.append("=== 连续日志结束 ===\\n");
+            captureBuffer.append("\n结束时间：").append(System.currentTimeMillis()).append(" (epoch ms)\n");
+            captureBuffer.append("结束时 PID：").append(run("pidof", captureTarget)).append("\n");
+            captureBuffer.append("结束时进程：").append(processRows(captureTarget)).append("\n");
+            captureBuffer.append("=== 连续日志结束 ===\n");
             String report = captureBuffer.toString();
             captureProcess = null;
             captureThread = null;
@@ -271,10 +271,10 @@ public final class ShellUserService extends ICompatService.Stub {
 
     private void appendCapture(String line) {
         synchronized (captureBuffer) {
-            captureBuffer.append(line).append('\\n');
+            captureBuffer.append(line).append('\n');
             if (captureBuffer.length() > MAX_CAPTURE_CHARS) {
                 int removeTo = captureBuffer.length() - (MAX_CAPTURE_CHARS * 3 / 4);
-                int newline = captureBuffer.indexOf("\\n", removeTo);
+                int newline = captureBuffer.indexOf("\n", removeTo);
                 captureBuffer.delete(0, newline >= 0 ? newline + 1 : removeTo);
             }
         }
