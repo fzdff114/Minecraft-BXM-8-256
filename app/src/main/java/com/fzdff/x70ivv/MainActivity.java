@@ -173,7 +173,8 @@ public final class MainActivity extends Activity {
         LinearLayout ops = card();
         ops.addView(text("操作", 16, 0xff142033, true), full());
         addButton(ops, "检测 ANGLE Provider / 游戏包", () -> withShell(this::inspect));
-        addButton(ops, "为目标游戏启用 ANGLE（单应用）", () -> withShell(this::applyAngle));
+        addButton(ops, "为目标游戏启用 ANGLE（仅 Provider 存在时）", () -> withShell(this::applyAngle));
+        addButton(ops, "切回原生 OpenGL（诊断基线）", () -> withShell(this::setNativeDriver));
         restoreButton = button("恢复修改前的驱动设置");
         restoreButton.setEnabled(false);
         restoreButton.setAlpha(0.45f);
@@ -196,24 +197,15 @@ public final class MainActivity extends Activity {
         });
         root.addView(outputCard, top(12));
 
-        root.addView(text("注意：ANGLE 是 OpenGL ES 到 Vulkan 的转换层，不是 GPU 驱动修复。没有系统 Provider 时，本工具不会安装或伪造驱动。即使切换成功，也必须在 X70i 真机测试 VV。", 12, 0xff64748b, false), top(14));
+        root.addView(text("诊断会在助手自己的 EGL/GLES 上下文测试 Shader 和 Framebuffer；结果不能直接代表 Minecraft 的渲染上下文。ANGLE 只影响 OpenGL ES，不会修复直接使用 Vulkan 的 RenderDragon 路径。", 12, 0xff64748b, false), top(14));
 
         glProbe = new GLSurfaceView(this);
         glProbe.setEGLContextClientVersion(3);
-        glProbe.setRenderer(new GLSurfaceView.Renderer() {
-            @Override public void onSurfaceCreated(GL10 gl, EGLConfig config) {
-                String vendor = GLES20.glGetString(GLES20.GL_VENDOR);
-                String renderer = GLES20.glGetString(GLES20.GL_RENDERER);
-                String version = GLES20.glGetString(GLES20.GL_VERSION);
-                glInfo = "本助手 GLES Vendor: " + vendor + "\nRenderer: " + renderer + "\nVersion: " + version;
-                main.post(() -> {
-                    if (device != null) device.setText(deviceSummary() + "\n" + glInfo + "\n（这是助手自身进程，不代表 Minecraft 的渲染器）");
-                });
-            }
-            @Override public void onSurfaceChanged(GL10 gl, int width, int height) { }
-            @Override public void onDrawFrame(GL10 gl) { }
-        });
-        root.addView(glProbe, new LinearLayout.LayoutParams(dp(1), dp(1)));
+        glProbe.setRenderer(new GlesDiagnostics(report -> main.post(() -> {
+            glInfo = report;
+            if (device != null) device.setText(deviceSummary() + "\n\n" + glInfo);
+        })));
+        root.addView(glProbe, new LinearLayout.LayoutParams(dp(2), dp(2)));
     }
 
     private String deviceSummary() {
@@ -284,20 +276,36 @@ public final class MainActivity extends Activity {
     }
 
     private void applyAngle() {
+        setDriver("angle");
+    }
+
+    private void setNativeDriver() {
+        setDriver("native");
+    }
+
+    private void setDriver(String driver) {
         String pkg = targetPackage();
         if (pkg.isEmpty()) { toast("请填写 Minecraft 游戏包名"); return; }
-        status("正在检查 ANGLE Provider…");
-        remote(() -> service.applyAngle(pkg), value -> {
-            if (value.startsWith("OK\n")) {
-                for (String line : value.split("\\n")) {
-                    if (line.startsWith("BACKUP=")) {
-                        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(pkg, line.substring(7)).apply();
-                        break;
-                    }
-                }
-                updateRestoreButton();
+        String label = "native".equals(driver) ? "原生 OpenGL" : "ANGLE";
+        status("正在检查并设置 " + label + "…");
+        remote(() -> service.setDriverPreference(pkg, driver), value -> saveBackup(pkg, value));
+    }
+
+    private void saveBackup(String pkg, String value) {
+        if (!value.startsWith("OK\n")) return;
+        String backup = null;
+        for (String line : value.split("\\n")) {
+            if (line.startsWith("BACKUP=")) {
+                backup = line.substring(7);
+                break;
             }
-        });
+        }
+        if (backup != null) {
+            android.content.SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+            // Preserve the first pre-tool state; do not replace it with a later test state.
+            if (!prefs.contains(pkg)) prefs.edit().putString(pkg, backup).apply();
+            updateRestoreButton();
+        }
     }
 
     private void restoreAngle() {
