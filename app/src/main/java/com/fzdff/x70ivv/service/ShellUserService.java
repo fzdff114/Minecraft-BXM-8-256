@@ -31,6 +31,7 @@ public final class ShellUserService extends ICompatService.Stub {
     private volatile Thread captureThread;
     private volatile boolean captureActive;
     private volatile String captureTarget = "com.mojang.minecraftpe";
+    private volatile long captureStartEpochMs;
     private final StringBuilder captureBuffer = new StringBuilder();
 
     @Override public void destroy() { System.exit(0); }
@@ -201,10 +202,11 @@ public final class ShellUserService extends ICompatService.Stub {
             return "OK\n启动阶段监视已经运行。当前目标：" + captureTarget;
         }
         try {
-            Process process = new ProcessBuilder("logcat", "-b", "all", "-v", "threadtime", "-T", "1")
+            Process process = new ProcessBuilder("logcat", "-b", "all", "-v", "epoch")
                     .redirectErrorStream(true).start();
             captureProcess = process;
             captureTarget = targetPackage;
+            captureStartEpochMs = System.currentTimeMillis();
             synchronized (captureBuffer) {
                 captureBuffer.setLength(0);
                 captureBuffer.append("=== X70i VV 启动阶段连续日志 ===\n");
@@ -260,7 +262,7 @@ public final class ShellUserService extends ICompatService.Stub {
                 new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (isGraphicsLogLine(line)) appendCapture(line);
+                if (isAfterCaptureStart(line) && isGraphicsLogLine(line)) appendCapture(line);
             }
         } catch (Exception error) {
             appendCapture("[X70iVV capture reader] " + error.getClass().getSimpleName() + ": " + error.getMessage());
@@ -277,6 +279,17 @@ public final class ShellUserService extends ICompatService.Stub {
                 int newline = captureBuffer.indexOf("\n", removeTo);
                 captureBuffer.delete(0, newline >= 0 ? newline + 1 : removeTo);
             }
+        }
+    }
+
+    private boolean isAfterCaptureStart(String line) {
+        int separator = line.indexOf(' ');
+        if (separator <= 0) return false;
+        try {
+            double epochSeconds = Double.parseDouble(line.substring(0, separator));
+            return (long) (epochSeconds * 1000.0) >= captureStartEpochMs - 1000L;
+        } catch (NumberFormatException ignored) {
+            return false;
         }
     }
 
