@@ -306,17 +306,18 @@ public final class ShellUserService extends ICompatService.Stub {
     private void monitorCaptureProcess() {
         while (captureActive) {
             String pids = run("pidof", captureTarget).trim();
+            List<String> newlyFound = new ArrayList<>();
             if (!pids.isEmpty()) {
                 synchronized (capturePids) {
                     for (String pid : pids.split("\\s+")) {
-                        if (pid.matches("[0-9]+") && capturePids.add(pid)) {
-                            // Log outside capturePids lock to avoid lock inversion with stopCapture().
-                        }
+                        if (pid.matches("[0-9]+") && capturePids.add(pid)) newlyFound.add(pid);
                     }
                 }
-                // Re-read outside the PID-set lock to keep process snapshots consistent.
             }
-            if (!pids.isEmpty()) appendCapture("[X70iVV process] MB Loader 宿主 PID=" + pids + "；" + processRows(captureTarget));
+            if (!newlyFound.isEmpty()) {
+                appendCapture("[X70iVV process] 发现 MB Loader 宿主 PID=" + String.join(",", newlyFound)
+                        + "；" + processRows(captureTarget));
+            }
             try { Thread.sleep(1000); }
             catch (InterruptedException error) { Thread.currentThread().interrupt(); break; }
         }
