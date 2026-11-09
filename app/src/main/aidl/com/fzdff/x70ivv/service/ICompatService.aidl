@@ -9,4 +9,6 @@ interface ICompatService {
     String clearDriverOverride(String targetPackage) = 7;
     String restoreAngle(String targetPackage, String backupEncoded) = 4;
     String collectGraphicsLogs() = 5;
+    String startGraphicsCapture(String targetPackage) = 8;
+    String stopGraphicsCapture() = 9;
 }
