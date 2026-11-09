@@ -41,13 +41,11 @@ import com.fzdff.x70ivv.service.ShellUserService;
 public final class MainActivity extends Activity {
     private static final int REQUEST_SHIZUKU = 501;
     private static final String PREFS = "angle_backup";
-    private static final String DEFAULT_GAME = "com.mojang.minecraftpe";
-    private static final String DEFAULT_LAUNCHER = "io.github.bambosan.mbloader";
+    private static final String DEFAULT_HOST = "io.github.bambosan.mbloader";
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private EditText gamePackage;
-    private EditText launcherPackage;
     private TextView status;
     private TextView device;
     private TextView result;
@@ -152,17 +150,11 @@ public final class MainActivity extends Activity {
         root.addView(deviceCard, top(12));
 
         LinearLayout gameCard = card();
-        gameCard.addView(text("实际渲染 Minecraft 3D 世界的包名", 16, 0xff142033, true), full());
-        gamePackage = edit(DEFAULT_GAME);
+        gameCard.addView(text("MB Loader 宿主包名（驱动设置 / PID / 日志 / 启动）", 16, 0xff142033, true), full());
+        gamePackage = edit(DEFAULT_HOST);
         gameCard.addView(gamePackage, top(8));
-        gameCard.addView(text("默认 com.mojang.minecraftpe。若 MB Loader 使用独立/克隆实例，请填写真正运行游戏画面的包名，而不是启动器包名。", 12, 0xff64748b, false), top(5));
+        gameCard.addView(text("默认 io.github.bambosan.mbloader。MB Loader 会在自己的应用进程中加载 Minecraft Activity，因此这里必须填写宿主包名，而不是 com.mojang.minecraftpe。", 12, 0xff64748b, false), top(5));
         root.addView(gameCard, top(12));
-
-        LinearLayout launcherCard = card();
-        launcherCard.addView(text("MB Loader 启动器包名（仅用于打开）", 16, 0xff142033, true), full());
-        launcherPackage = edit(DEFAULT_LAUNCHER);
-        launcherCard.addView(launcherPackage, top(8));
-        root.addView(launcherCard, top(12));
 
         gamePackage.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
@@ -175,8 +167,8 @@ public final class MainActivity extends Activity {
         addButton(ops, "检测 ANGLE Provider / 游戏包", () -> withShell(this::inspect));
         addButton(ops, "为目标游戏启用 ANGLE（仅 Provider 存在时）", () -> withShell(this::applyAngle));
         addButton(ops, "切回原生 OpenGL（诊断基线）", () -> withShell(this::setNativeDriver));
-        addButton(ops, "清除 Minecraft 的 ANGLE 强制覆盖（恢复系统默认）", () -> withShell(this::clearDriverOverride));
-        restoreButton = button("恢复修改前的驱动设置");
+        addButton(ops, "清除 MB Loader 宿主的 ANGLE 强制覆盖（恢复系统默认）", () -> withShell(this::clearDriverOverride));
+        restoreButton = button("恢复修改前的宿主驱动设置");
         restoreButton.setEnabled(false);
         restoreButton.setAlpha(0.45f);
         restoreButton.setOnClickListener(v -> withShell(this::restoreAngle));
@@ -200,7 +192,7 @@ public final class MainActivity extends Activity {
         });
         root.addView(outputCard, top(12));
 
-        root.addView(text("MB Loader 会在自己的宿主进程中加载 Minecraft 代码与原生库，因此启动阶段监视目标应为 MB Loader，而不是单独安装的 com.mojang.minecraftpe。监视器会轮询宿主 PID 并记录对应日志。日志仅保存在助手结果中，不会自动上传。", 12, 0xff64748b, false), top(14));
+        root.addView(text("驱动偏好、PID 和日志都以 MB Loader 宿主进程为目标。Minecraft 的原始 APK 只是代码和原生库来源，不应作为宿主进程包名。启动阶段监视会跟踪宿主 PID，日志保存在助手结果中，不会自动上传。", 12, 0xff64748b, false), top(14));
 
         glProbe = new GLSurfaceView(this);
         glProbe.setEGLContextClientVersion(3);
@@ -333,8 +325,8 @@ public final class MainActivity extends Activity {
     private void collectLogs() { remote(() -> service.collectGraphicsLogs(), null); }
 
     private void startCaptureAndLaunch() {
-        String pkg = launcherPackage.getText().toString().trim();
-        if (pkg.isEmpty()) { toast("请填写 MB Loader 包名"); return; }
+        String pkg = targetPackage();
+        if (pkg.isEmpty()) { toast("请填写 MB Loader 宿主包名"); return; }
         remote(() -> service.startGraphicsCapture(pkg), value -> {
             if (value.startsWith("OK")) {
                 toast("正在监视 MB Loader 宿主进程，现在启动游戏");
@@ -368,10 +360,10 @@ public final class MainActivity extends Activity {
     }
 
     private void launchLauncher() {
-        String pkg = launcherPackage.getText().toString().trim();
-        if (pkg.isEmpty()) { toast("请填写 MB Loader 包名"); return; }
+        String pkg = targetPackage();
+        if (pkg.isEmpty()) { toast("请填写 MB Loader 宿主包名"); return; }
         Intent intent = getPackageManager().getLaunchIntentForPackage(pkg);
-        if (intent == null) { toast("找不到启动器：" + pkg); return; }
+        if (intent == null) { toast("找不到 MB Loader 宿主应用：" + pkg); return; }
         try { startActivity(intent); }
         catch (Throwable error) { toast("启动失败：" + error.getMessage()); }
     }
