@@ -2,7 +2,7 @@
 
 **Honor X70i / PowerVR BXM-8-256 — Minecraft Bedrock native Vibrant Visuals compatibility research.**
 
-This repository contains the Android Studio project for **X70i VV Compatibility Assistant 0.2.2-alpha.1**. It is a diagnostic and per-app ANGLE preference helper, not a modified Minecraft APK or a GPU driver.
+This repository contains the Android Studio project for **X70i VV Compatibility Assistant 0.2.2-alpha.2**. It is a diagnostic and per-app ANGLE preference helper, not a modified Minecraft APK or a GPU driver.
 
 ## Device under investigation
 
