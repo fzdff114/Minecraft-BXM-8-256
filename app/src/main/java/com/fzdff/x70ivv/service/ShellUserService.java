@@ -212,7 +212,8 @@ public final class ShellUserService extends ICompatService.Stub {
             return "OK\n启动阶段监视已经运行。当前目标：" + captureTarget;
         }
         try {
-            Process process = new ProcessBuilder("logcat", "-b", "all", "-v", "threadtime", "-T", "1")
+            Process process = new ProcessBuilder("logcat", "-b", "main", "-b", "system", "-b", "crash", "-b", "events",
+                    "-v", "threadtime", "-T", "1")
                     .redirectErrorStream(true).start();
             captureProcess = process;
             captureTarget = targetPackage;
@@ -380,7 +381,7 @@ public final class ShellUserService extends ICompatService.Stub {
         try {
             Process previous = captureAppProcess;
             if (previous != null) previous.destroy();
-            Process appProcess = new ProcessBuilder("logcat", "--pid=" + pid, "-b", "all",
+            Process appProcess = new ProcessBuilder("logcat", "--pid=" + pid, "-b", "main", "-b", "system", "-b", "crash", "-b", "events",
                     "-v", "threadtime", "-T", "1").redirectErrorStream(true).start();
             captureAppPid = pid;
             captureAppProcess = appProcess;
@@ -429,7 +430,7 @@ public final class ShellUserService extends ICompatService.Stub {
         StringBuilder output = new StringBuilder();
         int lines = 0;
         try {
-            process = new ProcessBuilder("logcat", "-d", "--pid=" + pid, "-b", "all",
+            process = new ProcessBuilder("logcat", "-d", "--pid=" + pid, "-b", "main", "-b", "system", "-b", "crash", "-b", "events",
                     "-v", "threadtime", "-t", "3000").redirectErrorStream(true).start();
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
