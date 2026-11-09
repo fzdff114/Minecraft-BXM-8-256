@@ -81,10 +81,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create x70i-vv-compat-v0.1.0-alpha.1 \
+          gh release create x70i-vv-compat-v0.2.0-alpha.1 \
             app/build/outputs/apk/debug/app-debug.apk \
             X70i-VV-Compat-SHA256.txt \
             --target "$GITHUB_SHA" \
-            --title "X70i VV Compatibility Assistant v0.1.0-alpha.1" \
-            --notes "Debug test build for Honor X70i / PowerVR BXM-8-256. Includes ANGLE provider detection, per-app ANGLE setting backup/restore through Shizuku, and local graphics log collection. This is a diagnostic helper, not a modified Minecraft APK or a guaranteed Vibrant Visuals fix." \
+            --title "X70i VV Compatibility Assistant v0.2.0-alpha.1" \
+            --notes "Debug test build for Honor X70i / PowerVR BXM-8-256. Adds per-package ANGLE provider probing without enumerating all Android users, native OpenGL baseline switching with backup/restore, GLES 3.2 shader and framebuffer probes, EGL extension reporting, Minecraft process inspection, and filtered local RenderDragon/PowerVR/Vulkan log collection. Diagnostics run in the helper's own GLES context and do not prove Minecraft RenderDragon compatibility. This is not a modified Minecraft APK or a GPU driver." \
             --prerelease
