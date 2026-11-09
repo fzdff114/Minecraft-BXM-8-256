@@ -2,7 +2,7 @@
 
 **Honor X70i / PowerVR BXM-8-256 — Minecraft Bedrock native Vibrant Visuals compatibility research.**
 
-This repository contains the Android Studio project for **X70i VV Compatibility Assistant**. It is a diagnostic and per-app ANGLE preference helper, not a modified Minecraft APK or a GPU driver.
+This repository contains the Android Studio project for **X70i VV Compatibility Assistant 0.2.0-alpha.1**. It is a diagnostic and per-app ANGLE preference helper, not a modified Minecraft APK or a GPU driver.
 
 ## Device under investigation
 
@@ -16,15 +16,15 @@ This repository contains the Android Studio project for **X70i VV Compatibility 
 ## What the assistant does
 
 - Reads device, Vulkan feature declarations, and its own GLES renderer string.
-- Checks whether an ANGLE-related package/provider appears to be installed.
+- Checks likely ANGLE APK package paths individually (avoids package-manager all-user enumeration that caused a user-100 SecurityException on this ROM).
 - Reads Android's per-app ANGLE settings.
 - With Shizuku shell permission, can set **only the selected game's** ANGLE preference and restore the previous value.
-- Collects filtered local graphics logs (ANGLE / EGL / Vulkan / PowerVR / RenderDragon / shader / framebuffer).
+- Runs GLES 3 shader compile/link plus RGBA8, RGBA16F, sRGB and Depth24Stencil8 framebuffer checks in the helper process; reports EGL/GLES version, extensions, texture/renderbuffer limits and sample count.\n- Shows Minecraft PID/process rows and collects filtered local ANGLE / EGL / Vulkan / PowerVR / RenderDragon / shader / framebuffer logs.\n- Adds a reversible per-app switch to native OpenGL for a controlled baseline test.
 - Does not enable global ANGLE-for-all, modify Minecraft files, touch worlds, or upload logs.
 
 ## Important limitations
 
-This helper cannot add GPU features or repair a vendor driver. Seeing an ANGLE package is only a preliminary check; it does not prove the ROM can load ANGLE for Minecraft. ANGLE only intercepts OpenGL ES paths. If the Minecraft build uses Vulkan directly for its relevant RenderDragon path, changing the OpenGL driver preference will not affect that path.
+This helper cannot add GPU features or repair a vendor driver. Seeing an ANGLE package is only a preliminary check; it does not prove the ROM can load ANGLE for Minecraft. ANGLE only intercepts OpenGL ES paths. If the Minecraft build uses Vulkan directly for its relevant RenderDragon path, changing the OpenGL driver preference will not affect that path. The new GLES framebuffer/shader tests run inside the helper app, not Minecraft; a passing result does not guarantee the game's deferred renderer will work.
 
 The ANGLE route is optional and should only be tested when the ROM exposes a working ANGLE provider. The app saves the game's previous setting and offers a per-package restore. **Do not enable the global `angle_gl_driver_all_angle` setting.**
 
