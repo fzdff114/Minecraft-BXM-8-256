@@ -29,16 +29,16 @@ target_compile_definitions(mbmods PRIVATE
     WATER_REFLECTIONS_VERSION="0.1.0"
 )
 
-find_library(log-lib log REQUIRED)
-find_library(egl-lib EGL REQUIRED)
-find_library(gles-lib GLESv3 REQUIRED)
-find_library(dl-lib dl REQUIRED)
+find_library(LOG_LIB log REQUIRED)
+find_library(EGL_LIB EGL REQUIRED)
+find_library(GLES_LIB GLESv3 REQUIRED)
+find_library(DL_LIB dl REQUIRED)
 
 target_link_libraries(mbmods PRIVATE
-    ${egl-lib}
-    ${gles-lib}
-    ${dl-lib}
-    ${log-lib}
+    ${EGL_LIB}
+    ${GLES_LIB}
+    ${DL_LIB}
+    ${LOG_LIB}
 )
 
 target_link_options(mbmods PRIVATE
