@@ -182,6 +182,8 @@ public final class MainActivity extends Activity {
         restoreButton.setOnClickListener(v -> withShell(this::restoreAngle));
         ops.addView(restoreButton, top(8));
         addButton(ops, "打开 MB Loader", this::launchLauncher);
+        addButton(ops, "开始记录启动过程并打开 MB Loader", this::startCaptureAndLaunch);
+        addButton(ops, "停止监视并读取启动日志", () -> withShell(this::stopCapture));
         addButton(ops, "收集图形诊断日志", () -> withShell(this::collectLogs));
         addButton(ops, "打开 Shizuku 安装说明", () -> openUrl("https://shizuku.rikka.app/download/"));
         root.addView(ops, top(12));
@@ -198,7 +200,7 @@ public final class MainActivity extends Activity {
         });
         root.addView(outputCard, top(12));
 
-        root.addView(text("诊断会在助手自己的 EGL/GLES 上下文测试 Shader 和 Framebuffer；结果不能直接代表 Minecraft 的渲染上下文。ANGLE 只影响 OpenGL ES，不会修复直接使用 Vulkan 的 RenderDragon 路径。", 12, 0xff64748b, false), top(14));
+        root.addView(text("启动阶段监视会在打开 MBL2 前持续读取图形相关日志，返回助手后停止并读取。它记录的是整个切换过程，不用依赖最终显示的图形模式。日志仅保存在助手结果中，不会上传。诊断中的 GLES 测试仍运行在助手自己的上下文。", 12, 0xff64748b, false), top(14));
 
         glProbe = new GLSurfaceView(this);
         glProbe.setEGLContextClientVersion(3);
@@ -329,6 +331,20 @@ public final class MainActivity extends Activity {
     }
 
     private void collectLogs() { remote(() -> service.collectGraphicsLogs(), null); }
+
+    private void startCaptureAndLaunch() {
+        String pkg = targetPackage();
+        remote(() -> service.startGraphicsCapture(pkg), value -> {
+            if (value.startsWith("OK")) {
+                toast("启动阶段日志记录已开始，现在启动 MBL2");
+                launchLauncher();
+            }
+        });
+    }
+
+    private void stopCapture() {
+        remote(() -> service.stopGraphicsCapture(), null);
+    }
 
     private interface RemoteCall { String run() throws Exception; }
     private interface Completion { void accept(String value); }
