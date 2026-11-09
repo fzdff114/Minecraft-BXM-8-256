@@ -200,7 +200,7 @@ public final class MainActivity extends Activity {
         });
         root.addView(outputCard, top(12));
 
-        root.addView(text("启动阶段监视会在打开 MBL2 前持续读取图形相关日志，返回助手后停止并读取。它记录的是整个切换过程，不用依赖最终显示的图形模式。日志仅保存在助手结果中，不会上传。诊断中的 GLES 测试仍运行在助手自己的上下文。", 12, 0xff64748b, false), top(14));
+        root.addView(text("MB Loader 会在自己的宿主进程中加载 Minecraft 代码与原生库，因此启动阶段监视目标应为 MB Loader，而不是单独安装的 com.mojang.minecraftpe。监视器会轮询宿主 PID 并记录对应日志。日志仅保存在助手结果中，不会自动上传。", 12, 0xff64748b, false), top(14));
 
         glProbe = new GLSurfaceView(this);
         glProbe.setEGLContextClientVersion(3);
@@ -333,10 +333,11 @@ public final class MainActivity extends Activity {
     private void collectLogs() { remote(() -> service.collectGraphicsLogs(), null); }
 
     private void startCaptureAndLaunch() {
-        String pkg = targetPackage();
+        String pkg = launcherPackage.getText().toString().trim();
+        if (pkg.isEmpty()) { toast("请填写 MB Loader 包名"); return; }
         remote(() -> service.startGraphicsCapture(pkg), value -> {
             if (value.startsWith("OK")) {
-                toast("启动阶段日志记录已开始，现在启动 MBL2");
+                toast("正在监视 MB Loader 宿主进程，现在启动游戏");
                 launchLauncher();
             }
         });
