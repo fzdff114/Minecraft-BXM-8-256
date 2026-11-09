@@ -2,36 +2,66 @@
 #include <android/log.h>
 #include <dlfcn.h>
 #include "water_reflections.h"
+
 #define LOG_TAG "MBLoader-WaterFX"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
 static void* g_original = nullptr;
-static void load_original() {
-    if (g_original) return;
+
+static bool load_original() {
+    if (g_original) return true;
+
+    // The patched package keeps the vendor library beside this wrapper under
+    // the non-conflicting name libmods_original.so.
     g_original = dlopen("libmods_original.so", RTLD_NOW | RTLD_LOCAL);
-    if (!g_original)
-        g_original = dlopen("/data/data/io.github.bambosan.mbloader/lib/libmods_original.so", RTLD_NOW | RTLD_LOCAL);
+    if (!g_original) {
+        LOGE("Cannot load original MB Loader libmods.so: %s", dlerror());
+        return false;
+    }
+    return true;
 }
-template <typename T> static T original(const char* name) {
-    load_original();
-    return g_original ? reinterpret_cast<T>(dlsym(g_original, name)) : nullptr;
+
+template <typename T>
+static T original(const char* name) {
+    if (!load_original()) return nullptr;
+    return reinterpret_cast<T>(dlsym(g_original, name));
 }
-extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*, void*) {
+
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
+    using OnLoadFn = jint (*)(JavaVM*, void*);
+    const auto onLoad = original<OnLoadFn>("JNI_OnLoad");
+    if (!onLoad) {
+        LOGE("Original library does not export JNI_OnLoad");
+        return JNI_ERR;
+    }
+
+    const jint version = onLoad(vm, reserved);
+    if (version < JNI_VERSION_1_4) {
+        LOGE("Original JNI_OnLoad failed: %d", version);
+        return JNI_ERR;
+    }
+
+    // Initialize the optional WaterFX module only after the original loader
+    // has initialized successfully. Unsupported graphics contexts remain safe.
     waterfx::install();
-    LOGI("WaterFX wrapper loaded");
-    return JNI_VERSION_1_6;
+    LOGI("Original MB Loader native initialization forwarded; WaterFX probe initialized");
+    return version;
 }
-extern "C" JNIEXPORT void JNICALL Java_io_bambosan_mbloader_launcherUtils_NativeMods_customBuffers(JNIEnv* e,jclass c){
-    using F=void(*)(JNIEnv*,jclass); if(auto f=original<F>("Java_io_bambosan_mbloader_launcherUtils_NativeMods_customBuffers")) f(e,c); waterfx::install();
+
+#define FORWARD_VOID(method) \
+extern "C" JNIEXPORT void JNICALL \
+Java_io_bambosan_mbloader_launcherUtils_NativeMods_##method(JNIEnv* env, jclass cls) { \
+    using Fn = void (*)(JNIEnv*, jclass); \
+    if (auto fn = original<Fn>("Java_io_bambosan_mbloader_launcherUtils_NativeMods_" #method)) { \
+        fn(env, cls); \
+    } else { \
+        LOGE("Missing original JNI method: " #method); \
+    } \
 }
-extern "C" JNIEXPORT void JNICALL Java_io_bambosan_mbloader_launcherUtils_NativeMods_dynamicShadows(JNIEnv* e,jclass c){
-    using F=void(*)(JNIEnv*,jclass); if(auto f=original<F>("Java_io_bambosan_mbloader_launcherUtils_NativeMods_dynamicShadows")) f(e,c); waterfx::install();
-}
-extern "C" JNIEXPORT void JNICALL Java_io_bambosan_mbloader_launcherUtils_NativeMods_dofBlur(JNIEnv* e,jclass c){
-    using F=void(*)(JNIEnv*,jclass); if(auto f=original<F>("Java_io_bambosan_mbloader_launcherUtils_NativeMods_dofBlur")) f(e,c);
-}
-extern "C" JNIEXPORT void JNICALL Java_io_bambosan_mbloader_launcherUtils_NativeMods_fixGameLogo(JNIEnv* e,jclass c){
-    using F=void(*)(JNIEnv*,jclass); if(auto f=original<F>("Java_io_bambosan_mbloader_launcherUtils_NativeMods_fixGameLogo")) f(e,c);
-}
-extern "C" JNIEXPORT void JNICALL Java_io_bambosan_mbloader_launcherUtils_NativeMods_forceCloseOreUi(JNIEnv* e,jclass c){
-    using F=void(*)(JNIEnv*,jclass); if(auto f=original<F>("Java_io_bambosan_mbloader_launcherUtils_NativeMods_forceCloseOreUi")) f(e,c);
-}
+
+FORWARD_VOID(customBuffers)
+FORWARD_VOID(dynamicShadows)
+FORWARD_VOID(dofBlur)
+FORWARD_VOID(fixGameLogo)
+FORWARD_VOID(forceCloseOreUi)
