@@ -436,12 +436,12 @@ public final class ShellUserService extends ICompatService.Stub {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     lines++;
-                    if (output.length() < 120_000) output.append(line).append('\\n');
+                    if (output.length() < 120_000) output.append(line).append('\n');
                 }
             }
             int exit = process.waitFor();
-            if (lines == 0) output.append("没有返回日志行。\\n");
-            return "命令退出码：" + exit + "；返回行数：" + lines + "\\n" + output;
+            if (lines == 0) output.append("没有返回日志行。\n");
+            return "命令退出码：" + exit + "；返回行数：" + lines + "\n" + output;
         } catch (Exception error) {
             return "快照命令失败：" + error.getClass().getSimpleName() + ": " + error.getMessage();
         } finally {
